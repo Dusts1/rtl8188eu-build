@@ -1,0 +1,27 @@
+name: build-rtl8188eu
+
+on:
+  workflow_dispatch:    # 可手动触发
+  push:
+    branches:
+      - main            # 当推送到 main 分支时自动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SDK_URL: https://downloads.openwrt.org/releases/22.03.7/targets/rockchip/armv8/openwrt-sdk-22.03.7-rockchip-armv8_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential git wget xz-utils ca-certificates
+
+      - name: Download OpenWrt SDK
+        run: |
+          wget -c $SDK_URL -O sdk.tar.xz
+          tar -xf sdk.tar.xz
