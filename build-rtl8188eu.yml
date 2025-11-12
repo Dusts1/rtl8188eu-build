@@ -1,10 +1,10 @@
 name: build-rtl8188eu
 
 on:
-  workflow_dispatch:    # 可手动触发
+  workflow_dispatch:
   push:
     branches:
-      - main            # 当推送到 main 分支时自动触发
+      - main
 
 jobs:
   build:
@@ -34,15 +34,11 @@ jobs:
           mkdir -p package/rtl8188eus
           git clone --depth 1 https://github.com/aircrack-ng/rtl8188eus.git package/rtl8188eus/src
 
-          cat > package/rtl8188eus/Makefile <<'EOF'
+          cat <<'EOF' > package/rtl8188eus/Makefile
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=rtl8188eus
 PKG_RELEASE:=1
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com/aircrack-ng/rtl8188eus.git
-PKG_SOURCE_VERSION:=HEAD
-PKG_MAINTAINER:=istoreos-user
 
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
@@ -56,9 +52,7 @@ define KernelPackage/rtl8188eus
 endef
 
 define Build/Prepare
-	$(call Build/Prepare/Default)
-	mkdir -p $(PKG_BUILD_DIR)
-	cp -a $(PKG_SOURCE_DIR)/* $(PKG_BUILD_DIR)/
+	$(CP) ./src/* $(PKG_BUILD_DIR)/
 endef
 
 define Build/Compile
