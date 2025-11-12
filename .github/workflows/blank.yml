@@ -1,0 +1,87 @@
+name: build-rtl8188eu
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SDK_URL: https://downloads.openwrt.org/releases/22.03.7/targets/rockchip/armv8/openwrt-sdk-22.03.7-rockchip-armv8_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential git wget xz-utils ca-certificates
+
+      - name: Download OpenWrt SDK
+        run: |
+          wget -c $SDK_URL -O sdk.tar.xz
+          tar -xf sdk.tar.xz
+          SDK_DIR=$(find . -maxdepth 1 -type d -name "openwrt-sdk*" | head -n1)
+          echo "SDK_DIR=$SDK_DIR" >> $GITHUB_ENV
+
+      - name: Prepare driver source
+        run: |
+          cd $SDK_DIR
+          mkdir -p package/rtl8188eus
+          git clone --depth 1 https://github.com/aircrack-ng/rtl8188eus.git package/rtl8188eus/src
+
+          cat <<'EOF' > package/rtl8188eus/Makefile
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=rtl8188eus
+PKG_RELEASE:=1
+
+include $(INCLUDE_DIR)/kernel.mk
+include $(INCLUDE_DIR)/package.mk
+
+define KernelPackage/rtl8188eus
+  SUBMENU:=Wireless Drivers
+  TITLE:=Realtek 8188EU USB WiFi driver (rtl8188eus)
+  DEPENDS:=+kmod-usb-core +kmod-cfg80211
+  FILES:=$(PKG_BUILD_DIR)/8188eu.ko
+  AUTOLOAD:=$(call AutoLoad,50,8188eu)
+endef
+
+define Build/Prepare
+	$(CP) ./src/* $(PKG_BUILD_DIR)/
+endef
+
+define Build/Compile
+	$(MAKE) -C "$(LINUX_DIR)" M="$(PKG_BUILD_DIR)" modules
+endef
+
+$(eval $(call KernelPackage,rtl8188eus))
+EOF
+
+      - name: Update feeds
+        run: |
+          cd $SDK_DIR
+          ./scripts/feeds update -a || true
+          ./scripts/feeds install -a || true
+
+      - name: Compile driver
+        run: |
+          cd $SDK_DIR
+          make package/rtl8188eus/compile V=s -j$(nproc)
+
+      - name: Collect build artifacts
+        run: |
+          cd $SDK_DIR
+          mkdir -p $GITHUB_WORKSPACE/artifacts
+          find bin -type f -name "kmod-rtl8188eus*.ipk" -exec cp {} $GITHUB_WORKSPACE/artifacts/ \; || true
+          find build_dir -type f -name "8188eu.ko" -exec cp {} $GITHUB_WORKSPACE/artifacts/ \; || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtl8188eus-build
+          path: artifacts
